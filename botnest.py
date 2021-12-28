@@ -7,7 +7,7 @@ logging.basicConfig(level=logging.INFO)
 with open("config.json") as f:
     config = json.load(f)
 
-token = config["discord_token"]
+discord_token = config["discord_token"]
 
 
 class MyClient(discord.Client):
@@ -19,4 +19,4 @@ class MyClient(discord.Client):
 
 
 client = MyClient()
-client.run(token)
+client.run(discord_token)
