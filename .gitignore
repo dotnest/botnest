@@ -1,2 +1,3 @@
 config.json
 dev_*
+__pycache__/

@@ -1,6 +1,7 @@
 import discord
 import logging
 import json
+import anilist_api
 
 logging.basicConfig(level=logging.INFO)
 
@@ -12,10 +13,33 @@ discord_token = config["discord_token"]
 
 class MyClient(discord.Client):
     async def on_ready(self):
-        print("Logged on as {0}!".format(self.user))
+        print(f"Logged on as {self.user}!")
+        data = anilist_api.get_anime_list()
+        # pretty print
+        # data = json.dumps(data, indent=2, ensure_ascii=False)
+
+        output = ""
+
+        for list in data["data"]["MediaListCollection"]["lists"]:
+            output += list["name"] + ": \n\n"
+            for anime in list["entries"]:
+                anime = anime["media"]
+                output += "\n".join([title for title in anime["title"].values()]) + "\n"
+                output += f"{anime['episodes']} episodes, average {anime['duration']}min\n"
+                hours = anime['episodes'] * anime['duration'] / 60
+                hours = format(hours, '.1f')
+                output += f"{hours} hours total\n\n"
+
+        channel = client.get_channel(925475303386648667)
+        await channel.send(f"```\n{output}```")
 
     async def on_message(self, message):
         print("Message from {0.author}: {0.content}".format(message))
+        if message.author == client.user:
+            return
+
+        if message.content.startswith('!channel_id'):
+            await message.channel.send(message.channel.id)
 
 
 client = MyClient()
