@@ -14,12 +14,17 @@ discord_token = config["discord_token"]
 class MyClient(discord.Client):
     async def on_ready(self):
         print(f"Logged on as {self.user}!")
+        channel = client.get_channel(config["channel_id"])
+
+        # remove previous bot messages
+        await channel.purge(check=lambda m: m.author == client.user)
+
         data = anilist_api.get_anime_list()
         # pretty print
         # data = json.dumps(data, indent=2, ensure_ascii=False)
 
+        # stats printout
         output = ""
-
         for list in data["data"]["MediaListCollection"]["lists"]:
             output += list["name"] + ": \n\n"
             for anime in list["entries"]:
@@ -30,7 +35,6 @@ class MyClient(discord.Client):
                 hours = format(hours, '.1f')
                 output += f"{hours} hours total\n\n"
 
-        channel = client.get_channel(925475303386648667)
         await channel.send(f"```\n{output}```")
 
     async def on_message(self, message):
