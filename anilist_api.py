@@ -50,11 +50,17 @@ def get_anime_list():
                 name
                 entries {
                     status
+                    progress
                     media {
                         title {
                             english
                             native
                         }
+                        description
+                        coverImage {
+                            extraLarge
+                        }
+                        siteUrl
                         episodes
                         duration
                     }

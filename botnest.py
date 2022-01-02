@@ -25,7 +25,13 @@ class MyClient(discord.Client):
 
         # stats printout
         output = ""
+        watching = None
         for list in data["data"]["MediaListCollection"]["lists"]:
+            # saving anime in progress
+            if list["name"] == "Watching":
+                watching = list["entries"]
+
+            # general stats display
             output += list["name"] + ": \n\n"
             for anime in list["entries"]:
                 anime = anime["media"]
@@ -36,6 +42,22 @@ class MyClient(discord.Client):
                 output += f"{hours} hours total\n\n"
 
         await channel.send(f"```\n{output}```")
+
+        # individual anime in progress
+        if watching:
+            for anime in watching:
+                progress = str(anime["progress"])
+                anime = anime["media"]
+                progress += "/" + str(anime["episodes"])
+                title = f"{anime['title']['english']} / {anime['title']['native']}"
+                desc = f"{anime['description'][:300]}..."
+                # await channel.send(f"```\n{json.dumps(anime, indent=2, ensure_ascii=False)}```")
+                embed = discord.Embed(title=title, description=desc, color=0x00ff00)
+                # embed.set_author(name="icon", icon_url=anime["coverImage"]["extraLarge"])
+                embed.add_field(name="Progress: ", value=progress, inline=True)
+                # embed.add_field(name="Field1", value="hi", inline=False)
+                # embed.add_field(name="Field2", value="hi2", inline=False)
+                await channel.send(embed=embed)
 
     async def on_message(self, message):
         print("Message from {0.author}: {0.content}".format(message))
