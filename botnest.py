@@ -36,8 +36,11 @@ class MyClient(discord.Client):
 
             # general stats display
             for anime in list["entries"]:
-                anime = anime["media"]
-                hours = anime['episodes'] * anime['duration'] / 60
+                hours = 0
+                if anime["status"] in ["COMPLETED", "REPEATING"]:
+                    hours = anime["media"]['episodes'] * anime["media"]['duration'] / 60
+                elif anime["status"] in ["CURRENT", "PAUSED", "DROPPED"]:
+                    hours = anime["progress"] * anime["media"]['duration'] / 60
                 total_hours += hours
 
         total_hours = format(total_hours, ".1f")
