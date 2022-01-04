@@ -36,6 +36,7 @@ def update_anime():
     data = json.loads(response.text)
     print(data)
 
+
 def get_anime_list():
     """Return a dict of all user's registered anime"""
     query = """
@@ -52,6 +53,8 @@ def get_anime_list():
                     status
                     progress
                     media {
+                        id
+                        idMal
                         title {
                             english
                             native
@@ -59,6 +62,7 @@ def get_anime_list():
                         description
                         coverImage {
                             extraLarge
+                            color
                         }
                         siteUrl
                         episodes
@@ -78,10 +82,11 @@ def get_anime_list():
     data = json.loads(response.text)
     print(data)
 
-    with open("dev_anijson.json", "w", encoding='utf-8') as f:
+    with open("dev_anijson.json", "w", encoding="utf-8") as f:
         json.dump(data, f, ensure_ascii=False)
 
     return data
+
 
 get_anime_list()
 # add a stats screen, with total amount of episodes watched, hours watched
