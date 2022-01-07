@@ -10,6 +10,7 @@ with open("config.json") as f:
 
 discord_token = config["discord_token"]
 in_progress = {}
+default_reacts = ["⬆️", "⬇️", "⏸️", "❌"]
 
 intents = discord.Intents.all()
 client = discord.Client(intents=intents)
@@ -63,8 +64,10 @@ async def on_ready():
             embed = discord.Embed(title=title, description=desc, url=anime["siteUrl"], color=color) # 0x00ff00
             embed.add_field(name="Progress: ", value=progress_str)
             embed.set_thumbnail(url=anime["coverImage"]["extraLarge"])
-            in_progress[embed] = {"id": anime["id"], "progress": progress}
-            await channel.send(embed=embed)
+            message = await channel.send(embed=embed)
+            for emoji in default_reacts:
+                await message.add_reaction(emoji)
+            in_progress[message] = {"id": anime["id"], "progress": progress, "name": anime['title']['native']}
 
 
 @client.event
@@ -75,6 +78,24 @@ async def on_message(message):
 
     if message.content.startswith('!channel_id'):
         await message.channel.send(message.channel.id)
+
+
+@client.event
+async def on_reaction_add(reaction, user):
+    await process_reaction(reaction, user)
+
+
+@client.event
+async def on_reaction_remove(reaction, user):
+    await process_reaction(reaction, user)
+
+
+async def process_reaction(reaction, user):
+    if user == client.user or reaction.message not in in_progress or reaction not in default_reacts:
+        return
+    anime = in_progress[reaction.message]
+    print(f"{user} reacted with {reaction} ({reaction.emoji}) on this message:")
+    print(f"{anime['name']}: {anime['progress']}")
 
 
 client.run(discord_token)
