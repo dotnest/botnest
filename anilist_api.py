@@ -1,5 +1,6 @@
 import requests
 import json
+import aiohttp
 
 with open("config.json") as f:
     config = json.load(f)
@@ -17,7 +18,7 @@ headers = {
 }
 
 
-def update_anime():
+async def update_anime(id, status, progress):
     query = """
     mutation ($mediaId: Int, $status: MediaListStatus, $progress: Int) {
         SaveMediaListEntry (mediaId: $mediaId, status: $status, progress: $progress) {
@@ -28,16 +29,21 @@ def update_anime():
     }
     """
 
-    variables = {"mediaId": 1, "status": "CURRENT", "progress": 5}
+    variables = {"mediaId": id, "status": status, "progress": progress}
 
-    response = requests.post(
-        url, json={"query": query, "variables": variables}, headers=headers
-    )
-    data = json.loads(response.text)
-    print(data)
+    async with aiohttp.ClientSession() as session:
+        async with session.post(
+            url, json={"query": query, "variables": variables}, headers=headers
+        ) as r:
+            print(r.status)
+            if r.status == 200:
+                data = await r.json()
+                print(data)
+            else:
+                print(r)
 
 
-def get_anime_list():
+async def get_anime_list():
     """Return a dict of all user's registered anime"""
     query = """
     query ($userName: String) {
@@ -76,17 +82,17 @@ def get_anime_list():
 
     variables = {"userName": user_name}
 
-    response = requests.post(
-        url, json={"query": query, "variables": variables}, headers=headers
-    )
-    data = json.loads(response.text)
-    print(data)
+    async with aiohttp.ClientSession() as session:
+        async with session.post(
+            url, json={"query": query, "variables": variables}, headers=headers
+        ) as r:
+            print(r.status)
+            if r.status == 200:
+                data = await r.json()
 
-    with open("dev_anijson.json", "w", encoding="utf-8") as f:
-        json.dump(data, f, ensure_ascii=False)
+                with open("dev_anijson.json", "w", encoding="utf-8") as f:
+                    json.dump(data, f, ensure_ascii=False)
 
-    return data
-
-
-get_anime_list()
-# add a stats screen, with total amount of episodes watched, hours watched
+                return data
+            else:
+                print(r)
