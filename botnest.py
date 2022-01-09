@@ -10,7 +10,7 @@ with open("config.json") as f:
 
 discord_token = config["discord_token"]
 in_progress = {}
-default_reacts = ["⬆️", "⬇️", "⏸️", "❌"]
+default_reacts = {"⬆️": "increase", "⬇️": "decrease", "⏸️": "pause", "❌": "drop"}
 
 intents = discord.Intents.all()
 client = discord.Client(intents=intents)
@@ -60,10 +60,13 @@ async def on_ready():
             progress_str = f"{progress}/{anime['episodes']}"
             title = f"{anime['title']['native']}\n{anime['title']['english']}"
             desc = f"{anime['description'][:300]}..."
-            color = int(anime["coverImage"]["color"][1:], 16)
+            if anime["coverImage"]["color"]:
+                color = int(anime["coverImage"]["color"][1:], 16)
+            else:
+                color = 0x00FF00
             embed = discord.Embed(
                 title=title, description=desc, url=anime["siteUrl"], color=color
-            )  # 0x00ff00
+            )
             embed.add_field(name="Progress: ", value=progress_str)
             embed.set_thumbnail(url=anime["coverImage"]["extraLarge"])
             message = await channel.send(embed=embed)
@@ -86,6 +89,10 @@ async def on_message(message):
     if message.content.startswith("!channel_id"):
         await message.channel.send(message.channel.id)
 
+    if message.content == "!r":
+        await message.delete()
+        await on_ready()
+
 
 @client.event
 async def on_reaction_add(reaction, user):
@@ -107,6 +114,56 @@ async def process_reaction(reaction, user):
     anime = in_progress[reaction.message]
     print(f"{user} reacted with {reaction} ({reaction.emoji}) on this message:")
     print(f"{anime['name']}: {anime['progress']}/{anime['episodes']}")
+
+    action = default_reacts[reaction.emoji]
+    if action == "increase":
+        if anime["progress"] + 1 >= anime["episodes"]:
+            # update on website
+            await anilist_api.update_anime(
+                anime["id"], "COMPLETED", anime["progress"] + 1
+            )
+            # delete embed
+            await reaction.message.delete()
+            # delete from memory
+            del in_progress[reaction.message]
+        else:
+            # update on website
+            await anilist_api.update_anime(
+                anime["id"], "CURRENT", anime["progress"] + 1
+            )
+            # update embed
+            embed = reaction.message.embeds[0]
+            embed = embed.to_dict()
+            embed["fields"][0]["value"] = f"{anime['progress']+1}/{anime['episodes']}"
+            embed = discord.Embed.from_dict(embed)
+            await reaction.message.edit(embed=embed)
+            # update in memory
+            in_progress[reaction.message]["progress"] += 1
+    elif action == "decrease":
+        if anime["progress"] == 0:
+            return
+
+        # update on website
+        await anilist_api.update_anime(anime["id"], "CURRENT", anime["progress"] - 1)
+        # update embed
+        embed = reaction.message.embeds[0]
+        embed = embed.to_dict()
+        embed["fields"][0]["value"] = f"{anime['progress']-1}/{anime['episodes']}"
+        embed = discord.Embed.from_dict(embed)
+        await reaction.message.edit(embed=embed)
+        # update in memory
+        in_progress[reaction.message]["progress"] -= 1
+    elif action in ["pause", "drop"]:
+        if action == "pause":
+            status = "PAUSED"
+        else:
+            status = "DROPPED"
+        # update on website
+        await anilist_api.update_anime(anime["id"], status, anime["progress"])
+        # delete embed
+        await reaction.message.delete()
+        # delete from memory
+        del in_progress[reaction.message]
 
 
 client.run(discord_token)
