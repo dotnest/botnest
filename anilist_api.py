@@ -6,7 +6,6 @@ with open("config.json") as f:
     config = json.load(f)
 
 access_token = config["access_token"]
-user_id = config["user_id"]
 user_name = config["user_name"]
 
 url = "https://graphql.anilist.co"

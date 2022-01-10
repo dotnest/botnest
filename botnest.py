@@ -2,6 +2,7 @@ import discord
 import logging
 import json
 import anilist_api
+import re
 
 logging.basicConfig(level=logging.INFO)
 
@@ -19,7 +20,12 @@ client = discord.Client(intents=intents)
 @client.event
 async def on_ready():
     print(f"Logged on as {client.user}!")
-    channel = client.get_channel(config["channel_id"])
+    try:
+        channel = client.get_channel(int(config["channel_id"]))
+    except:
+        print("Couldn't get channel id from config")
+        print("Get one by typing '!channel_id' in channel you want your bot in")
+        return
 
     # remove previous bot messages
     await channel.purge(check=lambda m: m.author == client.user)
@@ -59,7 +65,8 @@ async def on_ready():
             anime = anime["media"]
             progress_str = f"{progress}/{anime['episodes']}"
             title = f"{anime['title']['native']}\n{anime['title']['english']}"
-            desc = f"{anime['description'][:300]}..."
+            desc = re.sub('<.*?>', '', anime['description'])
+            desc = f"{desc[:300]}..."
             if anime["coverImage"]["color"]:
                 color = int(anime["coverImage"]["color"][1:], 16)
             else:
