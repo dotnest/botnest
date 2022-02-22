@@ -65,7 +65,7 @@ async def on_ready():
             anime = anime["media"]
             progress_str = f"{progress}/{anime['episodes']}"
             title = f"{anime['title']['native']}\n{anime['title']['english']}"
-            desc = re.sub('<.*?>', '', anime['description'])
+            desc = re.sub("<.*?>", "", anime["description"])
             desc = f"{desc[:300]}..."
             if anime["coverImage"]["color"]:
                 color = int(anime["coverImage"]["color"][1:], 16)
@@ -174,3 +174,5 @@ async def process_reaction(reaction, user):
 
 
 client.run(discord_token)
+
+# TODO: youtube playlist support? with links to open on mobile/jidoujisho

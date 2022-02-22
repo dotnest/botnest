@@ -9,6 +9,9 @@ This bot allows you to track and update your immersion progress on [Anilist](htt
 - [Discord bot account](https://docs.pycord.dev/en/master/discord.html)
 - [Anilist API access](https://anilist.gitbook.io/anilist-apiv2-docs/overview/oauth/getting-started)
 
+    -   create an API client on [this](https://anilist.co/settings/developer) page, set redirect url to `https://anilist.co/api/v2/oauth/pin`
+    - run and follow instructions from `api_setup.py` to get your api access token, note that it will write to a file different from bot's own config
+
 ## Preparations
 - [Download](https://github.com/dotnest/botnest/archive/refs/heads/main.zip) and unpack this repository
 - Create a `config.json` file and paste the following inside
@@ -18,7 +21,7 @@ This bot allows you to track and update your immersion progress on [Anilist](htt
     "access_token": "your anilist access token here",
     "refresh_token": "your anilist refresh token here",
     "user_name": "your anilist username here",
-    "channel_id": "your channel id here"
+    "channel_id": "your discord channel id here"
 }
 ```
 - Put in your discord bot token, Anilist's access and refresh tokens and Anilist username
