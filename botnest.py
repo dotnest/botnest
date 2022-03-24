@@ -19,6 +19,119 @@ client = discord.Client(intents=intents)
 
 @client.event
 async def on_ready():
+    async def process_anime():
+        data = await anilist_api.get_anime_list()
+        # pretty print
+        # data = json.dumps(data, indent=2, ensure_ascii=False)
+
+        # stats printout
+        watching = None
+        total_hours = 0
+        username = data["data"]["MediaListCollection"]["user"]["name"]
+        user_url = data["data"]["MediaListCollection"]["user"]["siteUrl"]
+        embed = discord.Embed(title=username, url=user_url, color=0x00FF00)
+        for list in data["data"]["MediaListCollection"]["lists"]:
+            # saving anime in progress
+            if list["name"] == "Watching":
+                watching = list["entries"]
+
+            # general stats display
+            for anime in list["entries"]:
+                hours = 0
+                if anime["status"] in ["COMPLETED", "REPEATING"]:
+                    hours = anime["media"]["episodes"] * anime["media"]["duration"] / 60
+                elif anime["status"] in ["CURRENT", "PAUSED", "DROPPED"]:
+                    hours = anime["progress"] * anime["media"]["duration"] / 60
+                total_hours += hours
+
+        total_hours = format(total_hours, ".1f")
+        embed.add_field(name="Total hours watched", value=total_hours)
+        await channel.send(embed=embed)
+
+        # individual anime in progress
+        if watching:
+            for anime in watching:
+                progress = anime["progress"]
+                anime = anime["media"]
+                progress_str = f"{progress}/{anime['episodes']}"
+                title = f"{anime['title']['native']}\n{anime['title']['english']}"
+                desc = re.sub("<.*?>", "", anime["description"])
+                desc = f"{desc[:300]}..."
+                if anime["coverImage"]["color"]:
+                    color = int(anime["coverImage"]["color"][1:], 16)
+                else:
+                    color = 0x00FF00
+                embed = discord.Embed(
+                    title=title, description=desc, url=anime["siteUrl"], color=color
+                )
+                embed.add_field(name="Progress: ", value=progress_str)
+                embed.set_thumbnail(url=anime["coverImage"]["extraLarge"])
+                message = await channel.send(embed=embed)
+                in_progress[message] = {
+                    "id": anime["id"],
+                    "progress": progress,
+                    "episodes": anime["episodes"],
+                    "name": anime["title"]["native"],
+                }
+                for emoji in default_reacts:
+                    await message.add_reaction(emoji)
+
+    async def process_manga():
+        data = await anilist_api.get_manga_list()
+        # pretty print
+        # data = json.dumps(data, indent=2, ensure_ascii=False)
+
+        # stats printout
+        reading = None
+        total_chapters = 0
+        username = data["data"]["MediaListCollection"]["user"]["name"]
+        user_url = data["data"]["MediaListCollection"]["user"]["siteUrl"]
+        embed = discord.Embed(title=username, url=user_url, color=0x00FF00)
+        for list in data["data"]["MediaListCollection"]["lists"]:
+            # saving manga in progress
+            if list["name"] == "Reading":
+                reading = list["entries"]
+
+            # general stats display
+            for manga in list["entries"]:
+                chapters = 0
+                if manga["status"] in ["COMPLETED", "REPEATING"]:
+                    chapters = manga["media"]["chapters"]
+                elif manga["status"] in ["CURRENT", "PAUSED", "DROPPED"]:
+                    chapters = manga["progress"]
+                total_chapters += chapters
+
+        embed.add_field(name="Total chapters read", value=total_chapters)
+        await channel.send(embed=embed)
+
+        # individual manga in progress
+        if reading:
+            for manga in reading:
+                progress = manga["progress"]
+                manga = manga["media"]
+                progress_str = f"{progress}/{manga['chapters']}"
+                title = f"{manga['title']['native']}\n{manga['title']['english']}"
+                desc = re.sub("<.*?>", "", manga["description"])
+                desc = f"{desc[:300]}..."
+                if manga["coverImage"]["color"]:
+                    color = int(manga["coverImage"]["color"][1:], 16)
+                else:
+                    color = 0x00FF00
+                embed = discord.Embed(
+                    title=title, description=desc, url=manga["siteUrl"], color=color
+                )
+                embed.add_field(name="Progress: ", value=progress_str)
+                embed.set_thumbnail(url=manga["coverImage"]["extraLarge"])
+                message = await channel.send(embed=embed)
+                in_progress[message] = {
+                    "id": manga["id"],
+                    "progress": progress,
+                    "chapters": manga["chapters"],
+                    "name": manga["title"]["native"],
+                }
+                for emoji in default_reacts:
+                    await message.add_reaction(emoji)
+
     print(f"Logged on as {client.user}!")
     try:
         channel = client.get_channel(int(config["channel_id"]))
@@ -30,61 +143,8 @@ async def on_ready():
     # remove previous bot messages
     await channel.purge(check=lambda m: m.author == client.user)
 
-    data = await anilist_api.get_anime_list()
-    # pretty print
-    # data = json.dumps(data, indent=2, ensure_ascii=False)
-
-    # stats printout
-    watching = None
-    total_hours = 0
-    username = data["data"]["MediaListCollection"]["user"]["name"]
-    user_url = data["data"]["MediaListCollection"]["user"]["siteUrl"]
-    embed = discord.Embed(title=username, url=user_url, color=0x00FF00)
-    for list in data["data"]["MediaListCollection"]["lists"]:
-        # saving anime in progress
-        if list["name"] == "Watching":
-            watching = list["entries"]
-
-        # general stats display
-        for anime in list["entries"]:
-            hours = 0
-            if anime["status"] in ["COMPLETED", "REPEATING"]:
-                hours = anime["media"]["episodes"] * anime["media"]["duration"] / 60
-            elif anime["status"] in ["CURRENT", "PAUSED", "DROPPED"]:
-                hours = anime["progress"] * anime["media"]["duration"] / 60
-            total_hours += hours
-
-    total_hours = format(total_hours, ".1f")
-    embed.add_field(name="Total hours watched", value=total_hours)
-    await channel.send(embed=embed)
-
-    # individual anime in progress
-    if watching:
-        for anime in watching:
-            progress = anime["progress"]
-            anime = anime["media"]
-            progress_str = f"{progress}/{anime['episodes']}"
-            title = f"{anime['title']['native']}\n{anime['title']['english']}"
-            desc = re.sub("<.*?>", "", anime["description"])
-            desc = f"{desc[:300]}..."
-            if anime["coverImage"]["color"]:
-                color = int(anime["coverImage"]["color"][1:], 16)
-            else:
-                color = 0x00FF00
-            embed = discord.Embed(
-                title=title, description=desc, url=anime["siteUrl"], color=color
-            )
-            embed.add_field(name="Progress: ", value=progress_str)
-            embed.set_thumbnail(url=anime["coverImage"]["extraLarge"])
-            message = await channel.send(embed=embed)
-            in_progress[message] = {
-                "id": anime["id"],
-                "progress": progress,
-                "episodes": anime["episodes"],
-                "name": anime["title"]["native"],
-            }
-            for emoji in default_reacts:
-                await message.add_reaction(emoji)
+    await process_anime()
+    await process_manga()
 
 
 @client.event
