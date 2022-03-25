@@ -68,9 +68,10 @@ async def on_ready():
                 embed.set_thumbnail(url=anime["coverImage"]["extraLarge"])
                 message = await channel.send(embed=embed)
                 in_progress[message] = {
+                    "type": "anime",
                     "id": anime["id"],
                     "progress": progress,
-                    "episodes": anime["episodes"],
+                    "total": anime["episodes"],
                     "name": anime["title"]["native"],
                 }
                 for emoji in default_reacts:
@@ -109,7 +110,11 @@ async def on_ready():
             for manga in reading:
                 progress = manga["progress"]
                 manga = manga["media"]
-                progress_str = f"{progress}/{manga['chapters']}"
+                # because manga chapters/volumes are sometimes null
+                if manga["chapters"]:
+                    progress_str = f"{progress}/{manga['chapters']}"
+                else:
+                    progress_str = f"{progress}"
                 title = f"{manga['title']['native']}\n{manga['title']['english']}"
                 desc = re.sub("<.*?>", "", manga["description"])
                 desc = f"{desc[:300]}..."
@@ -124,9 +129,10 @@ async def on_ready():
                 embed.set_thumbnail(url=manga["coverImage"]["extraLarge"])
                 message = await channel.send(embed=embed)
                 in_progress[message] = {
+                    "type": "manga",
                     "id": manga["id"],
                     "progress": progress,
-                    "chapters": manga["chapters"],
+                    "total": manga["chapters"],
                     "name": manga["title"]["native"],
                 }
                 for emoji in default_reacts:
@@ -178,16 +184,16 @@ async def process_reaction(reaction, user):
         or reaction.emoji not in default_reacts
     ):
         return
-    anime = in_progress[reaction.message]
+    media = in_progress[reaction.message]
     print(f"{user} reacted with {reaction} ({reaction.emoji}) on this message:")
-    print(f"{anime['name']}: {anime['progress']}/{anime['episodes']}")
+    print(f"{media['name']}: {media['progress']}/{media['total']}")
 
     action = default_reacts[reaction.emoji]
     if action == "increase":
-        if anime["progress"] + 1 >= anime["episodes"]:
+        if media["total"] and media["progress"] + 1 >= media["total"]:
             # update on website
-            await anilist_api.update_anime(
-                anime["id"], "COMPLETED", anime["progress"] + 1
+            await anilist_api.update_media(
+                media["id"], "COMPLETED", media["progress"] + 1
             )
             # delete embed
             await reaction.message.delete()
@@ -195,27 +201,35 @@ async def process_reaction(reaction, user):
             del in_progress[reaction.message]
         else:
             # update on website
-            await anilist_api.update_anime(
-                anime["id"], "CURRENT", anime["progress"] + 1
+            await anilist_api.update_media(
+                media["id"], "CURRENT", media["progress"] + 1
             )
             # update embed
             embed = reaction.message.embeds[0]
             embed = embed.to_dict()
-            embed["fields"][0]["value"] = f"{anime['progress']+1}/{anime['episodes']}"
+            # because manga chapters/volumes are sometimes null
+            if media["total"]:
+                embed["fields"][0]["value"] = f"{media['progress']+1}/{media['total']}"
+            else:
+                embed["fields"][0]["value"] = f"{media['progress']+1}"
             embed = discord.Embed.from_dict(embed)
             await reaction.message.edit(embed=embed)
             # update in memory
             in_progress[reaction.message]["progress"] += 1
     elif action == "decrease":
-        if anime["progress"] == 0:
+        if media["progress"] == 0:
             return
 
         # update on website
-        await anilist_api.update_anime(anime["id"], "CURRENT", anime["progress"] - 1)
+        await anilist_api.update_media(media["id"], "CURRENT", media["progress"] - 1)
         # update embed
         embed = reaction.message.embeds[0]
         embed = embed.to_dict()
-        embed["fields"][0]["value"] = f"{anime['progress']-1}/{anime['episodes']}"
+        # because manga chapters/volumes are sometimes null
+        if media["total"]:
+            embed["fields"][0]["value"] = f"{media['progress']-1}/{media['total']}"
+        else:
+            embed["fields"][0]["value"] = f"{media['progress']-1}"
         embed = discord.Embed.from_dict(embed)
         await reaction.message.edit(embed=embed)
         # update in memory
@@ -226,7 +240,7 @@ async def process_reaction(reaction, user):
         else:
             status = "DROPPED"
         # update on website
-        await anilist_api.update_anime(anime["id"], status, anime["progress"])
+        await anilist_api.update_media(media["id"], status, media["progress"])
         # delete embed
         await reaction.message.delete()
         # delete from memory

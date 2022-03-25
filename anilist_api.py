@@ -17,7 +17,7 @@ headers = {
 }
 
 
-async def update_anime(id, status, progress):
+async def update_media(id, status, progress):
     query = """
     mutation ($mediaId: Int, $status: MediaListStatus, $progress: Int) {
         SaveMediaListEntry (mediaId: $mediaId, status: $status, progress: $progress) {
