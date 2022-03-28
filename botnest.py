@@ -3,6 +3,7 @@ import logging
 import json
 import anilist_api
 import re
+import pytube
 
 logging.basicConfig(level=logging.INFO)
 
@@ -16,10 +17,12 @@ default_reacts = {"⬆️": "increase", "⬇️": "decrease", "⏸️": "pause",
 intents = discord.Intents.all()
 client = discord.Client(intents=intents)
 
+playlists = config["youtube_playlists"]
+
 
 @client.event
 async def on_ready():
-    async def process_anime():
+    async def process_anime(channel):
         data = await anilist_api.get_anime_list()
         # pretty print
         # data = json.dumps(data, indent=2, ensure_ascii=False)
@@ -77,7 +80,7 @@ async def on_ready():
                 for emoji in default_reacts:
                     await message.add_reaction(emoji)
 
-    async def process_manga():
+    async def process_manga(channel):
         data = await anilist_api.get_manga_list()
         # pretty print
         # data = json.dumps(data, indent=2, ensure_ascii=False)
@@ -138,6 +141,23 @@ async def on_ready():
                 for emoji in default_reacts:
                     await message.add_reaction(emoji)
 
+    async def process_playlists(channel):
+        for playlist_url, index in playlists.items():
+            playlist = pytube.Playlist(playlist_url)
+            embed = discord.Embed(
+                title=playlist.title, description=playlist.description, url=playlist_url
+            )
+            next_video = playlist.videos[index]
+            url = playlist.video_urls[index]
+            embed.add_field(name="Next video:", value=f"[{next_video.title}]({url})")
+            embed.set_thumbnail(url=next_video.thumbnail_url)
+            message = await channel.send(embed=embed)
+            in_progress[message] = {
+                "type": "playlist",
+                "index": index,
+                "playlist_url": playlist_url,
+            }
+
     print(f"Logged on as {client.user}!")
     try:
         channel = client.get_channel(int(config["channel_id"]))
@@ -149,8 +169,9 @@ async def on_ready():
     # remove previous bot messages
     await channel.purge(check=lambda m: m.author == client.user)
 
-    await process_anime()
-    await process_manga()
+    await process_anime(channel)
+    await process_manga(channel)
+    await process_playlists(channel)
 
 
 @client.event
@@ -165,6 +186,26 @@ async def on_message(message):
     if message.content == "!r":
         await message.delete()
         await on_ready()
+
+    if (
+        message.channel.id == int(config["channel_id"])
+        and "youtube.com" in message.content
+    ):
+        try:
+            playlist = pytube.Playlist(message.content)
+            if "index=" in message.content:
+                index = int(message.content.split("index=")[1])
+            else:
+                index = 0
+            await message.delete()
+            # saving in memory
+            playlists[playlist.playlist_url] = index
+            config["youtube_playlists"] = playlists
+            # saving in config
+            with open("config.json", "w") as f:
+                json.dump(config, f, indent=4)
+        except:
+            print("Couldn't load youtube link")
 
 
 @client.event

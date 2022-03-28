@@ -21,7 +21,8 @@ This bot allows you to track and update your immersion progress on [Anilist](htt
     "access_token": "your anilist access token here",
     "refresh_token": "your anilist refresh token here",
     "user_name": "your anilist username here",
-    "channel_id": "your discord channel id here"
+    "channel_id": "your discord channel id here",
+    "youtube_playlists": {}
 }
 ```
 - Put in your discord bot token, Anilist's access and refresh tokens and Anilist username
@@ -31,3 +32,4 @@ This bot allows you to track and update your immersion progress on [Anilist](htt
 ## Available commands
 - `!r` - resyncs with Anilist
 - `!channel_id` - prints out current channel id
+- to add a youtube playlist to track - just paste the url to a playlist (or to a video in a playlist) in the tracking channel (for now you'll have to `!r` for it to appear)
