@@ -20,7 +20,7 @@ This bot allows you to track and update your immersion progress on [Anilist](htt
     "discord_token": "your discord bot token here",
     "access_token": "your anilist access token here",
     "refresh_token": "your anilist refresh token here",
-    "user_name": "your anilist username here",
+    "username": "your anilist username here",
     "channel_id": "your discord channel id here",
     "youtube_playlists": {}
 }

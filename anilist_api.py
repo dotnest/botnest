@@ -1,12 +1,13 @@
 import requests
 import json
 import aiohttp
+import media
 
 with open("config.json") as f:
     config = json.load(f)
 
 access_token = config["access_token"]
-user_name = config["user_name"]
+username = config["username"]
 
 url = "https://graphql.anilist.co"
 
@@ -79,7 +80,7 @@ async def get_anime_list():
     }
     """
 
-    variables = {"userName": user_name}
+    variables = {"userName": username}
 
     async with aiohttp.ClientSession() as session:
         async with session.post(
@@ -92,7 +93,13 @@ async def get_anime_list():
                 with open("dev_anijson.json", "w", encoding="utf-8") as f:
                     json.dump(data, f, ensure_ascii=False)
 
-                return data
+                to_return = []
+
+                for list in data["data"]["MediaListCollection"]["lists"]:
+                    for anime in list["entries"]:
+                        to_return.append(media.Media(anime))
+
+                return to_return
             else:
                 print(r)
 
@@ -134,7 +141,7 @@ async def get_manga_list():
     }
     """
 
-    variables = {"userName": user_name}
+    variables = {"userName": username}
 
     async with aiohttp.ClientSession() as session:
         async with session.post(
