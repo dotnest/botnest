@@ -71,28 +71,25 @@ async def on_ready():
 
     async def process_manga(channel):
         data = await anilist_api.get_manga_list()
-        # pretty print
-        # data = json.dumps(data, indent=2, ensure_ascii=False)
 
         # stats printout
-        reading = None
+        reading = []
         total_chapters = 0
-        username = data["data"]["MediaListCollection"]["user"]["name"]
-        user_url = data["data"]["MediaListCollection"]["user"]["siteUrl"]
+        username = config["username"]
+        user_url = f"https://anilist.co/user/{username}"
         embed = discord.Embed(title=username, url=user_url, color=0x00FF00)
-        for list in data["data"]["MediaListCollection"]["lists"]:
+        for manga in data:
             # saving manga in progress
-            if list["name"] == "Reading":
-                reading = list["entries"]
+            if manga.status == "CURRENT":
+                reading.append(manga)
 
             # general stats display
-            for manga in list["entries"]:
-                chapters = 0
-                if manga["status"] in ["COMPLETED", "REPEATING"]:
-                    chapters = manga["media"]["chapters"]
-                elif manga["status"] in ["CURRENT", "PAUSED", "DROPPED"]:
-                    chapters = manga["progress"]
-                total_chapters += chapters
+            chapters = 0
+            if manga.status in ["COMPLETED", "REPEATING"]:
+                chapters = manga.total
+            elif manga.status in ["CURRENT", "PAUSED", "DROPPED"]:
+                chapters = manga.progress
+            total_chapters += chapters
 
         embed.add_field(name="Total chapters read", value=total_chapters)
         await channel.send(embed=embed)
@@ -100,33 +97,25 @@ async def on_ready():
         # individual manga in progress
         if reading:
             for manga in reading:
-                progress = manga["progress"]
-                manga = manga["media"]
                 # because manga chapters/volumes are sometimes null
-                if manga["chapters"]:
-                    progress_str = f"{progress}/{manga['chapters']}"
+                if manga.total:
+                    progress_str = f"{manga.progress}/{manga.total}"
                 else:
-                    progress_str = f"{progress}"
-                title = f"{manga['title']['native']}\n{manga['title']['english']}"
-                desc = re.sub("<.*?>", "", manga["description"])
+                    progress_str = f"{manga.progress}"
+                title = f"{manga.title_jp}\n{manga.title_en}"
+                desc = re.sub("<.*?>", "", manga.description)
                 desc = f"{desc[:300]}..."
-                if manga["coverImage"]["color"]:
-                    color = int(manga["coverImage"]["color"][1:], 16)
+                if manga.color:
+                    color = int(manga.color[1:], 16)
                 else:
                     color = 0x00FF00
                 embed = discord.Embed(
-                    title=title, description=desc, url=manga["siteUrl"], color=color
+                    title=title, description=desc, url=manga.site_url, color=color
                 )
                 embed.add_field(name="Progress: ", value=progress_str)
-                embed.set_thumbnail(url=manga["coverImage"]["extraLarge"])
+                embed.set_thumbnail(url=manga.cover_image)
                 message = await channel.send(embed=embed)
-                in_progress[message] = {
-                    "type": "manga",
-                    "id": manga["id"],
-                    "progress": progress,
-                    "total": manga["chapters"],
-                    "name": manga["title"]["native"],
-                }
+                in_progress[message] = manga
                 for emoji in default_reacts:
                     await message.add_reaction(emoji)
 
@@ -159,7 +148,7 @@ async def on_ready():
     await channel.purge(check=lambda m: m.author == client.user)
 
     await process_anime(channel)
-    # await process_manga(channel)
+    await process_manga(channel)
     await process_playlists(channel)
 
 

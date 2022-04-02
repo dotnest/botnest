@@ -97,7 +97,7 @@ async def get_anime_list():
 
                 for list in data["data"]["MediaListCollection"]["lists"]:
                     for anime in list["entries"]:
-                        to_return.append(media.Media(anime))
+                        to_return.append(media.Media(anime, "anime"))
 
                 return to_return
             else:
@@ -154,6 +154,12 @@ async def get_manga_list():
                 with open("dev_anijson.json", "w", encoding="utf-8") as f:
                     json.dump(data, f, ensure_ascii=False)
 
-                return data
+                to_return = []
+
+                for list in data["data"]["MediaListCollection"]["lists"]:
+                    for manga in list["entries"]:
+                        to_return.append(media.Media(manga, "manga"))
+
+                return to_return
             else:
                 print(r)
