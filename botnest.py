@@ -49,7 +49,7 @@ async def on_ready():
         await channel.send(embed=embed)
 
         # individual anime in progress
-        if watching:
+        if len(watching) > 0:
             for anime in watching:
                 progress_str = f"{anime.progress}/{anime.total}"
                 title = f"{anime.title_jp}\n{anime.title_en}"
@@ -95,7 +95,7 @@ async def on_ready():
         await channel.send(embed=embed)
 
         # individual manga in progress
-        if reading:
+        if len(reading) > 0:
             for manga in reading:
                 # because manga chapters/volumes are sometimes null
                 if manga.total:
