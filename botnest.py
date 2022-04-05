@@ -18,6 +18,7 @@ intents = discord.Intents.all()
 client = discord.Client(intents=intents)
 
 playlists = config["youtube_playlists"]
+playlist_reacts = {"⬆️": "increase", "⬇️": "decrease", "❌": "drop"}
 
 
 @client.event
@@ -134,7 +135,10 @@ async def on_ready():
                 "type": "playlist",
                 "index": index,
                 "playlist_url": playlist_url,
+                "playlist": playlist,
             }
+            for emoji in playlist_reacts:
+                await message.add_reaction(emoji)
 
     print(f"Logged on as {client.user}!")
     try:
@@ -197,69 +201,147 @@ async def on_reaction_remove(reaction, user):
 
 
 async def process_reaction(reaction, user):
+    async def process_media(reaction, media, action):
+        if action == "increase":
+            if media.total and media.progress + 1 >= media.total:
+                # update on website
+                await anilist_api.update_media(
+                    media.id, "COMPLETED", media.progress + 1
+                )
+                # delete embed
+                await reaction.message.delete()
+                # delete from memory
+                del in_progress[reaction.message]
+            else:
+                # update on website
+                await anilist_api.update_media(media.id, "CURRENT", media.progress + 1)
+                # update embed
+                embed = reaction.message.embeds[0]
+                embed = embed.to_dict()
+                # to see embed structure:
+                # with open("dev_embed.json", "w") as f:
+                #     json.dump(embed, f, indent=4)
+                # because manga chapters/volumes are sometimes null
+                if media.total:
+                    embed["fields"][0]["value"] = f"{media.progress+1}/{media.total}"
+                else:
+                    embed["fields"][0]["value"] = f"{media.progress+1}"
+                embed = discord.Embed.from_dict(embed)
+                await reaction.message.edit(embed=embed)
+                # update in memory
+                in_progress[reaction.message].progress += 1
+        elif action == "decrease":
+            if media.progress == 0:
+                return
+
+            # update on website
+            await anilist_api.update_media(media.id, "CURRENT", media.progress - 1)
+            # update embed
+            embed = reaction.message.embeds[0]
+            embed = embed.to_dict()
+            # because manga chapters/volumes are sometimes null
+            if media.total:
+                embed["fields"][0]["value"] = f"{media.progress-1}/{media.total}"
+            else:
+                embed["fields"][0]["value"] = f"{media.progress-1}"
+            embed = discord.Embed.from_dict(embed)
+            await reaction.message.edit(embed=embed)
+            # update in memory
+            in_progress[reaction.message].progress -= 1
+        elif action in ["pause", "drop"]:
+            if action == "pause":
+                status = "PAUSED"
+            else:
+                status = "DROPPED"
+            # update on website
+            await anilist_api.update_media(media.id, status, media.progress)
+            # delete embed
+            await reaction.message.delete()
+            # delete from memory
+            del in_progress[reaction.message]
+
+    async def process_playlist(reaction, media, action):
+        playlist = media["playlist"]
+        index = media["index"]
+        playlist_url = media["playlist_url"]
+        if action == "increase":
+            if index + 1 >= playlist.length:
+                # delete from config
+                del playlists[playlist_url]
+                config["youtube_playlists"] = playlists
+                with open("config.json", "w") as f:
+                    json.dump(config, f, indent=4)
+                # delete embed
+                await reaction.message.delete()
+                # delete from memory
+                del in_progress[reaction.message]
+            else:
+                # update in config
+                playlists[playlist_url] += 1
+                config["youtube_playlists"] = playlists
+                with open("config.json", "w") as f:
+                    json.dump(config, f, indent=4)
+                # update embed
+                embed = reaction.message.embeds[0]
+                embed = embed.to_dict()
+                # to see embed structure:
+                # with open("dev_embed.json", "w") as f:
+                #     json.dump(embed, f, indent=4)
+                next_video = playlist.videos[index + 1]
+                url = playlist.video_urls[index + 1]
+                embed["fields"][0]["value"] = f"[{next_video.title}]({url})"
+                embed = discord.Embed.from_dict(embed)
+                await reaction.message.edit(embed=embed)
+                # update in memory
+                in_progress[reaction.message]["index"] += 1
+        elif action == "decrease":
+            if index == 0:
+                return
+
+            # update in config
+            playlists[playlist_url] -= 1
+            config["youtube_playlists"] = playlists
+            with open("config.json", "w") as f:
+                json.dump(config, f, indent=4)
+            # update embed
+            embed = reaction.message.embeds[0]
+            embed = embed.to_dict()
+            prev_video = playlist.videos[index - 1]
+            url = playlist.video_urls[index - 1]
+            embed["fields"][0]["value"] = f"[{prev_video.title}]({url})"
+            embed = discord.Embed.from_dict(embed)
+            await reaction.message.edit(embed=embed)
+            # update in memory
+            in_progress[reaction.message]["index"] -= 1
+        elif action == "drop":
+            # delete from config
+            del playlists[playlist_url]
+            config["youtube_playlists"] = playlists
+            with open("config.json", "w") as f:
+                json.dump(config, f, indent=4)
+            # delete embed
+            await reaction.message.delete()
+            # delete from memory
+            del in_progress[reaction.message]
+
+    # ignoring unwanted reactions
     if (
         user == client.user
         or reaction.message not in in_progress
         or reaction.emoji not in default_reacts
     ):
         return
+
     media = in_progress[reaction.message]
-    print(f"{user} reacted with {reaction} ({reaction.emoji}) on this message:")
-    print(f"{media.title_jp}: {media.progress}/{media.total}")
-
     action = default_reacts[reaction.emoji]
-    if action == "increase":
-        if media.total and media.progress + 1 >= media.total:
-            # update on website
-            await anilist_api.update_media(media.id, "COMPLETED", media.progress + 1)
-            # delete embed
-            await reaction.message.delete()
-            # delete from memory
-            del in_progress[reaction.message]
-        else:
-            # update on website
-            await anilist_api.update_media(media.id, "CURRENT", media.progress + 1)
-            # update embed
-            embed = reaction.message.embeds[0]
-            embed = embed.to_dict()
-            # because manga chapters/volumes are sometimes null
-            if media.total:
-                embed["fields"][0]["value"] = f"{media.progress+1}/{media.total}"
-            else:
-                embed["fields"][0]["value"] = f"{media.progress+1}"
-            embed = discord.Embed.from_dict(embed)
-            await reaction.message.edit(embed=embed)
-            # update in memory
-            in_progress[reaction.message].progress += 1
-    elif action == "decrease":
-        if media.progress == 0:
-            return
+    print(f"{user} reacted with {reaction} ({reaction.emoji})")
 
-        # update on website
-        await anilist_api.update_media(media.id, "CURRENT", media.progress - 1)
-        # update embed
-        embed = reaction.message.embeds[0]
-        embed = embed.to_dict()
-        # because manga chapters/volumes are sometimes null
-        if media.total:
-            embed["fields"][0]["value"] = f"{media.progress-1}/{media.total}"
-        else:
-            embed["fields"][0]["value"] = f"{media.progress-1}"
-        embed = discord.Embed.from_dict(embed)
-        await reaction.message.edit(embed=embed)
-        # update in memory
-        in_progress[reaction.message].progress -= 1
-    elif action in ["pause", "drop"]:
-        if action == "pause":
-            status = "PAUSED"
-        else:
-            status = "DROPPED"
-        # update on website
-        await anilist_api.update_media(media.id, status, media.progress)
-        # delete embed
-        await reaction.message.delete()
-        # delete from memory
-        del in_progress[reaction.message]
+    if isinstance(media, anilist_api.media.Media):
+        # processing anime and manga
+        await process_media(reaction, media, action)
+    elif isinstance(media, dict) and media["type"] == "playlist":
+        # processing youtube playlists
+        await process_playlist(reaction, media, action)
 
 
 client.run(discord_token)
