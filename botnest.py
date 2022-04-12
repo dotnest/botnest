@@ -123,8 +123,13 @@ async def on_ready():
     async def process_playlists(channel):
         for playlist_url, index in playlists.items():
             playlist = pytube.Playlist(playlist_url)
+            # because pytube throws an exception if there's no description
+            try:
+                description = playlist.description
+            except:
+                description = ""
             embed = discord.Embed(
-                title=playlist.title, description=playlist.description, url=playlist_url
+                title=playlist.title, description=description, url=playlist_url
             )
             next_video = playlist.videos[index]
             url = playlist.video_urls[index]
@@ -169,25 +174,33 @@ async def on_message(message):
         await message.delete()
         await on_ready()
 
-    if (
-        message.channel.id == int(config["channel_id"])
-        and "youtube.com" in message.content
+    if message.channel.id == int(config["channel_id"]) and (
+        "youtube.com" in message.content or "youtu.be" in message.content
     ):
         try:
             playlist = pytube.Playlist(message.content)
             if "index=" in message.content:
                 index = int(message.content.split("index=")[1])
             else:
-                index = 0
+                video_url = pytube.YouTube(message.content).watch_url
+                if "https://www.youtube" not in video_url:
+                    # because pytube
+                    video_url = video_url.replace("https://you", "https://www.you")
+                if video_url in playlist.video_urls:
+                    index = list(playlist.video_urls).index(video_url)
+                else:
+                    index = 0
             await message.delete()
+            print("got index", index)
             # saving in memory
             playlists[playlist.playlist_url] = index
             config["youtube_playlists"] = playlists
             # saving in config
             with open("config.json", "w") as f:
                 json.dump(config, f, indent=4)
-        except:
+        except Exception as e:
             print("Couldn't load youtube link")
+            print(e)
 
 
 @client.event
